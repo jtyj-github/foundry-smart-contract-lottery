@@ -17,6 +17,7 @@ contract Raffle is VRFConsumerBaseV2Plus {
     error Raffle__NotEnoughEthToEnterRaffle();
     error Raffle__TransferFailed();
     error Raffle__RaffleNotOpen();
+    error Raffle__UpkeepNotNeeded(uint256 balance, uint256 players, uint256 raffleState);
 
     /**
      * Type Declarations
@@ -77,10 +78,34 @@ contract Raffle is VRFConsumerBaseV2Plus {
         emit RaffleEntered(msg.sender); // rule of thumb is to emit something whenever storage is updated
     }
 
-    function pickWinner() external {
-        if (block.timestamp - s_lastTimestamp > i_interval) {
-            revert(); // TODO: implement custom error
+    /**
+     *   @dev function to check if lottery is ready to pick a winner
+     *   Following will need to be True for upkeepNeeded to be True:
+     *   1. Raffle is open
+     *   2. Current time is greater than the last timestamp + interval
+     *   3. The contract has ETH
+     *   4. Implicitly, subscription has LINK
+     */
+    function checkUpkeep(bytes memory /* checkData */ )
+        public
+        view
+        returns (bool upkeepNeeded, bytes memory /* performData */ )
+    {
+        bool timeHasPassed = (block.timestamp - s_lastTimestamp) >= i_interval;
+        bool isOpened = s_raffleState == RaffleState.OPEN;
+        bool hasBalance = address(this).balance > 0;
+        bool hasPlayers = s_players.length > 0;
+
+        upkeepNeeded = timeHasPassed && isOpened && hasBalance && hasPlayers;
+        return (upkeepNeeded, "");
+    }
+
+    function performUpkeep(bytes calldata /* performData */) external {
+        (bool upkeepNeeded,) = checkUpkeep("");
+        if (!upkeepNeeded) {
+            revert Raffle__UpkeepNotNeeded(address(this).balance, s_players.length, uint256(s_raffleState));
         }
+
         VRFV2PlusClient.RandomWordsRequest memory request = VRFV2PlusClient.RandomWordsRequest({
             keyHash: i_keyHash,
             subId: i_subscriptionId,
