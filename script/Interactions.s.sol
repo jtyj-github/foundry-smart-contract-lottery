@@ -70,7 +70,15 @@ contract AddConsumer is Script {
         addConsumer(mostRecentlyDeployed, vrfCoordinator, subId);
     }
 
-    function addConsumer(address contractToAddVrf, address vrfCoordinator, uint256 subId) public {}
+    function addConsumer(address contractToAddVrf, address vrfCoordinator, uint256 subId) public {
+        console.log("Adding consumer to contract: ", contractToAddVrf);
+        console.log("Adding consumer to vrfCoordinator: ", vrfCoordinator);
+        console.log("On chainid: ", block.chainid);
+
+        vm.startBroadcast();
+        VRFCoordinatorV2_5Mock(vrfCoordinator).addConsumer(subId, contractToAddVrf);
+        vm.stopBroadcast();
+    }
 
     function run() external {
         address mostRecentlyDeployed = DevOpsTools.get_most_recently_deployed("Raffle", block.chainid);
